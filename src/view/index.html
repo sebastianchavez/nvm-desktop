@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NVM Desktop</title>
+    <style>
+        .container-node-versions{
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+        .container-app{
+            padding: 1rem;
+        }
+        .container-app h1 {
+            font-size: 2.2rem;
+            text-align: center;
+        }
+        body{
+            padding: 0;
+            margin: 0;
+            background-color: #F5F6FA;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-app">
+        <h1>NVM Desktop</h1>
+        <div id="nvm" class="container-node-versions"></div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron')
+        let versions = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+        let nodeList = []
+        let inUse = ''
+
+        async function setVersions(){
+            for await(let v of versions){
+                let version 
+                let nodeVersion = nodeList.find(x => x.split('.')[0] == v)
+                if(nodeVersion){
+                    version = nodeVersion
+                } else {
+                    version = v
+                }
+                createHtmlInputs(version)
+            }
+        }
+
+        function createHtmlInputs(version) {
+            let div = document.createElement('div')
+            let label = document.createElement('label')
+            let radioBtn = document.createElement('input')
+            let span = document.createElement('span')
+            label.style.fontSize = '2.2rem'
+            label.style.fontWeight = 'bold'
+            label.innerText = version
+            label.style.width = '8rem'
+            label.id = 'lbl_'+version.toString().split('.')[0]
+            radioBtn.type = 'radio'
+            radioBtn.name = 'selected'
+            radioBtn.value = version
+            radioBtn.id = 'rb_'+version.toString().split('.')[0]
+            span.id = 'span_'+version.toString().split('.')[0]
+            if(inUse == version) {
+                radioBtn.checked = true
+            }
+            radioBtn.onchange = (ev) => {
+                selectVersion(ev)
+            }
+            if(version.toString().includes('.')){
+                span.innerText = 'Instalado'
+                span.style.backgroundColor = '#44bd32'
+            } else {
+                span.innerText = 'Sin instalar'
+                span.style.backgroundColor = '#c23616'
+            }
+            span.style.fontSize = '.8rem'
+            span.style.padding = '.3rem .5rem'
+            span.style.borderRadius = '4px'
+            span.style.display = 'flex'
+            span.style.justifyContent = 'center'
+            span.style.alignItems = 'center'
+            span.style.color = 'white'
+            span.style.width = '5rem'
+            div.style.display = 'flex'
+            div.style.gap = '.8rem'
+            div.style.width = '100%'
+            div.style.justifyContent = 'space-between'
+            div.style.alignItems = 'center'
+            div.appendChild(label)
+            div.appendChild(radioBtn)
+            div.appendChild(span)
+            nvm.appendChild(div)
+        }
+
+        function selectVersion(ev){
+            const version = ev.target.value
+            console.log(version);
+            if(!version.includes('.')){
+                console.log('install');
+                nvmInstall(version)
+            } else {
+                console.log('use');
+                nvmUse(version)
+            }
+        }
+
+        function nvmList(){
+            ipcRenderer.send('nvmList')
+        }
+
+        function nvmUse(version){
+            ipcRenderer.send('nvmUse', { version })
+        }
+
+        function nvmInstall(version){
+            ipcRenderer.send('nvmInstall', { version })
+            document.getElementById('span_'+version.split('.')[0]).innerHTML = 'Instalando...'
+        }
+
+        ipcRenderer.on('nodeVersionsInstalled', (event, data) => {
+            inUse = ''
+            nodeList = []
+            data.split('\n').map(x => {
+                let version = x.split(' ').join('').split('(')[0]
+                if(x.includes('*')){
+                    version = version.replace('*','')
+                    inUse = version
+                }
+                if(version != ''){
+                    nodeList.push(version)
+                }
+            })
+            setVersions()
+            console.log('node versions:', {nodeList, inUse});
+        })
+
+        ipcRenderer.on('nodeInstalled', (event, data) => {
+            let span = document.getElementById('span_'+data)
+            let label = document.getElementById('lbl_'+data)
+            span.innerHTML = 'Instalado'
+            span.style.backgroundColor = '#44bd32'
+            nvmUse(data)
+        })
+
+        nvmList()
+    </script>
+</body>
+</html>
